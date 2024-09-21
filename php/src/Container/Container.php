@@ -2,7 +2,6 @@
 
 namespace AIO\Container;
 
-use AIO\Container\State\IContainerState;
 use AIO\Data\ConfigurationManager;
 use AIO\Docker\DockerActionManager;
 use AIO\ContainerDefinitionFetcher;
@@ -170,7 +169,7 @@ class Container {
         return $this->dockerActionManager->GetContainerRestartingState($this);
     }
 
-    public function GetUpdateState() : IContainerState {
+    public function GetUpdateState() : bool {
         return $this->dockerActionManager->GetContainerUpdateState($this);
     }
 

@@ -40,19 +40,19 @@
         {% endif %}
 
         {% for container in containers %}
-            {% if container.GetDisplayName() != '' and class(container.GetRunningState()) == 'AIO\\Container\\State\\RunningState' %}
+            {% if container.GetDisplayName() != '' and container.GetRunningState() is constant('AIO\\Container\\State::Running') %}
                 {% set isAnyRunning = true %}
             {% endif %}
-            {% if container.GetDisplayName() != '' and class(container.GetRestartingState()) == 'AIO\\Container\\State\\RestartingState' %}
+            {% if container.GetDisplayName() != '' and container.GetRestartingState() is constant('AIO\\Container\\State::Restarting') %}
                 {% set isAnyRestarting = true %}
             {% endif %}
-            {% if container.GetIdentifier() == 'nextcloud-aio-watchtower' and class(container.GetRunningState()) == 'AIO\\Container\\State\\RunningState' %}
+            {% if container.GetIdentifier() == 'nextcloud-aio-watchtower' and (container.GetRunningState() is constant('AIO\\Container\\State::Running') or container.GetRunningState() is constant('AIO\\Container\\State::Unhealthy')) %}
                 {% set isWatchtowerRunning = true %}
             {% endif %}
-            {% if container.GetIdentifier() == 'nextcloud-aio-domaincheck' and class(container.GetRunningState()) == 'AIO\\Container\\State\\RunningState' %}
+            {% if container.GetIdentifier() == 'nextcloud-aio-domaincheck' and container.GetRunningState() is constant('AIO\\Container\\State::Running') or container.GetRunningState() is constant('AIO\\Container\\State::Unhealthy')) %}
                 {% set isDomaincheckRunning = true %}
             {% endif %}
-            {% if container.GetIdentifier() == 'nextcloud-aio-apache' and class(container.GetStartingState()) == 'AIO\\Container\\State\\StartingState' %}
+            {% if container.GetIdentifier() == 'nextcloud-aio-apache' and container.GetStartingState() is constant('AIO\\Container\\State::Starting') %}
                 {% set isApacheStarting = true %}
             {% endif %}
         {% endfor %}
@@ -261,14 +261,21 @@
                         {% for container in containers %}
                             {% if container.GetDisplayName() != '' %}
                                 <li>
-                                    {% if class(container.GetStartingState()) == 'AIO\\Container\\State\\StartingState' %}
+                                    {% if container.GetStartingState() is constant('AIO\\Container\\State::Starting') %}
                                         <span class="status running"></span>
                                         <span>{{ container.GetDisplayName() }} (<a href="/api/docker/logs?id={{ container.GetIdentifier() }}" target="_blank" rel="noopener">Starting</a>)
                                         {% if container.GetDocumentation() != '' %}
                                             (<a href="{{ container.GetDocumentation() }}">docs</a>)
                                         {% endif %}
                                         </span>
-                                    {% elseif class(container.GetRunningState()) == 'AIO\\Container\\State\\RunningState' %}
+                                    {% elseif container.GetRunningState() is constant('AIO\\Container\\State::Unhealthy') %}
+                                        <span class="status running"></span>
+                                        <span>{{ container.GetDisplayName() }} (<a href="/api/docker/logs?id={{ container.GetIdentifier() }}" target="_blank" rel="noopener">Unhealthy</a>)
+                                        {% if container.GetDocumentation() != '' %}
+                                            (<a href="{{ container.GetDocumentation() }}">docs</a>)
+                                        {% endif %}
+                                        </span>
+                                    {% elseif container.GetRunningState() is constant('AIO\\Container\\State::Running') %}
                                         <span class="status success"></span>
                                         <span>{{ container.GetDisplayName() }} (<a href="/api/docker/logs?id={{ container.GetIdentifier() }}" target="_blank" rel="noopener">Running</a>)
                                         {% if container.GetDocumentation() != '' %}

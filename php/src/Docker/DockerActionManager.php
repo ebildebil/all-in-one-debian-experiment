@@ -3,15 +3,7 @@
 namespace AIO\Docker;
 
 use AIO\Container\Container;
-use AIO\Container\State\IContainerState;
-use AIO\Container\State\ImageDoesNotExistState;
-use AIO\Container\State\StartingState;
-use AIO\Container\State\RunningState;
-use AIO\Container\State\RestartingState;
-use AIO\Container\State\NotRestartingState;
-use AIO\Container\State\VersionDifferentState;
-use AIO\Container\State\StoppedState;
-use AIO\Container\State\VersionEqualState;
+use AIO\Container\IContainerState;
 use AIO\Data\ConfigurationManager;
 use GuzzleHttp\Exception\RequestException;
 use AIO\ContainerDefinitionFetcher;
@@ -62,17 +54,21 @@ class DockerActionManager
             $response = $this->guzzleClient->get($url);
         } catch (RequestException $e) {
             if ($e->getCode() === 404) {
-                return new ImageDoesNotExistState();
+                return IContainerState::ImageDoesNotExist;
             }
             throw $e;
         }
 
         $responseBody = json_decode((string)$response->getBody(), true);
 
-        if ($responseBody['State']['Running'] === true) {
-            return new RunningState();
-        } else {
-            return new StoppedState();
+        if ($responseBody['State']['Running'] !== true) {
+            return IContainerState::Stopped;
+        }
+        else if(array_key_exists('Health', $responseBody['State']) && $responseBody['State']['Health']['Status'] !== 'healthy') {
+            return IContainerState::Unhealthy;
+        }
+        else {
+            return IContainerState::Running;
         }
     }
 
@@ -83,7 +79,7 @@ class DockerActionManager
             $response = $this->guzzleClient->get($url);
         } catch (RequestException $e) {
             if ($e->getCode() === 404) {
-                return new ImageDoesNotExistState();
+                return IContainerState::ImageDoesNotExist;
             }
             throw $e;
         }
@@ -91,13 +87,13 @@ class DockerActionManager
         $responseBody = json_decode((string)$response->getBody(), true);
 
         if ($responseBody['State']['Restarting'] === true) {
-            return new RestartingState();
+            return IContainerState::Restarting;
         } else {
-            return new NotRestartingState();
+            return IContainerState::NotRestarting;
         }
     }
 
-    public function GetContainerUpdateState(Container $container) : IContainerState
+    public function GetContainerUpdateState(Container $container) : bool
     {
         $tag = $container->GetImageTag();
         if ($tag === '%AIO_CHANNEL%') {
@@ -106,28 +102,26 @@ class DockerActionManager
 
         $runningDigests = $this->GetRepoDigestsOfContainer($container->GetIdentifier());
         if ($runningDigests === null) {
-            return new VersionDifferentState();
+            return false;
         }
         $remoteDigest = $this->dockerHubManager->GetLatestDigestOfTag($container->GetContainerName(), $tag);
         if ($remoteDigest === null) {
-            return new VersionEqualstate();
+            return true;
         }
 
         foreach($runningDigests as $runningDigest) {
             if ($runningDigest === $remoteDigest) {
-                return new VersionEqualState();
+                return true;
             }
         }
-        return new VersionDifferentState();
+        return false;
     }
 
     public function GetContainerStartingState(Container $container) : IContainerState
     {
         $runningState = $this->GetContainerRunningState($container);
-        if ($runningState instanceof StoppedState) {
-            return new StoppedState();
-        } elseif ($runningState instanceof ImageDoesNotExistState) {
-            return new ImageDoesNotExistState();
+        if ($runningState === IContainerState::Stopped || $runningState === IContainerState::ImageDoesNotExist) {
+            return $runningState;
         }
 
         $containerName = $container->GetIdentifier();
@@ -142,12 +136,12 @@ class DockerActionManager
             $connection = @fsockopen($containerName, (int)$internalPort, $errno, $errstr, 0.2);
             if ($connection) {
                 fclose($connection);
-                return new RunningState();
+                return $runningState;
             } else {
-                return new StartingState();
+                return IContainerState::Starting;
             }
         } else {
-            return new RunningState();
+            return $runningState;
         }
     }
 
@@ -641,7 +635,7 @@ class DockerActionManager
         $container = $this->containerDefinitionFetcher->GetContainerById($id);
 
         $updateAvailable = "";
-        if ($container->GetUpdateState() instanceof VersionDifferentState) {
+        if ($container->GetUpdateState() === false) {
             $updateAvailable = '1';
         }
         foreach ($container->GetDependsOn() as $dependency) {
@@ -802,7 +796,7 @@ class DockerActionManager
 
     public function sendNotification(Container $container, string $subject, string $message, string $file = '/notify.sh') : void
     {
-        if ($this->GetContainerStartingState($container) instanceof RunningState) {
+        if ($this->GetContainerStartingState($container) === IContainerState::Running) {
 
             $containerName = $container->GetIdentifier();
 
@@ -986,7 +980,7 @@ class DockerActionManager
     public function isLoginAllowed() : bool {
         $id = 'nextcloud-aio-apache';
         $apacheContainer = $this->containerDefinitionFetcher->GetContainerById($id);
-        if ($this->GetContainerStartingState($apacheContainer) instanceof RunningState) {
+        if ($this->GetContainerStartingState($apacheContainer) === IContainerState::Running) {
             return false;
         }
         return true;
@@ -995,7 +989,7 @@ class DockerActionManager
     public function isBackupContainerRunning() : bool {
         $id = 'nextcloud-aio-borgbackup';
         $backupContainer = $this->containerDefinitionFetcher->GetContainerById($id);
-        if ($this->GetContainerRunningState($backupContainer) instanceof RunningState) {
+        if ($this->GetContainerRunningState($backupContainer) === IContainerState::Running) {
             return true;
         }
         return false;
