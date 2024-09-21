@@ -2,13 +2,13 @@
 
 namespace AIO\Container;
 
-enum IContainerState
+enum IContainerState: string
 {
-    case ImageDoesNotExist;
-    case NotRestarting;
-    case Restarting;
-    case Running;
-    case Starting;
-    case Stopped;
-    case Unhealthy;
+    case ImageDoesNotExist = 'image_does_not_exist';
+    case NotRestarting = 'not_restarting';
+    case Restarting = 'restarting';
+    case Running = 'running';
+    case Starting = 'starting';
+    case Stopped = 'stopped';
+    case Unhealthy = 'unhealthy';
 }
