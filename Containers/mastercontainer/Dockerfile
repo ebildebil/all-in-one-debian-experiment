@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:latest
 # Docker CLI is a requirement
-FROM docker:27.2.1-cli AS docker
+FROM docker:27.3.1-cli AS docker
 
 # Caddy is a requirement
 FROM caddy:2.8.4-alpine AS caddy
@@ -42,7 +42,7 @@ RUN set -ex; \
     apk add --no-cache --virtual .build-deps \
         autoconf \
         build-base; \
-    pecl install APCu-5.1.23; \
+    pecl install APCu-5.1.24; \
     docker-php-ext-enable apcu; \
     rm -r /tmp/pear; \
     runDeps="$( \
